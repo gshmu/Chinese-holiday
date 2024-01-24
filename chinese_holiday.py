@@ -20,6 +20,7 @@ import requests
 from bs4 import BeautifulSoup
 
 HOLIDAY_DATA_PATH = os.path.join(os.getcwd(), "holiday.json")
+P_LINE_FIX = re.compile(r"[(（][^)）]+.")
 
 
 def get_holiday_data(year, force_refresh=False):
@@ -175,6 +176,10 @@ def decode_response_content(response):
     return page_content
 
 
+def fix_line(line):
+    return P_LINE_FIX.sub("", line)
+
+
 def parse_holiday_info(url):
     """从国务院公告链接中解析节假日信息
 
@@ -208,6 +213,7 @@ def parse_holiday_info(url):
         re.VERBOSE,
     )
     for holiday_line in holiday_lines:
+        holiday_line = fix_line(holiday_line)
         for holiday_occur in reg_holiday_occur.finditer(holiday_line):
             first_holiday, last_holiday, count_day = holiday_occur.groups()
             if count_day is None:
@@ -220,12 +226,16 @@ def parse_holiday_info(url):
             last_holiday = first_holiday + dt.timedelta(days=int(count_day) - 1)
             holiday_data.append((first_holiday.strftime("%Y-%m-%d"), last_holiday.strftime("%Y-%m-%d"), False))
 
-        for workday_occur in re.finditer(r"((?:(?:\d{4}年)?\d{1,2}月\d{1,2}日（星期.+?）、?)+)上班。", holiday_line):
+        for workday_occur in re.finditer(r'((?:(?:(?:\d{4}年)?\d{1,2}月)?\d{1,2}日、?)+)上班。', holiday_line):
             work_str = workday_occur.group(1)
-            workdays = re.findall(r"(?:\d{4}年)?\d{1,2}月\d{1,2}日", work_str)
+            workdays = re.findall(r"(?:(?:\d{4}年)?\d{1,2}月|(?<=、))\d{1,2}日", work_str)
+            before_workday = ""
             for workday in workdays:
+                if "月" not in workday:
+                    workday = before_workday[:before_workday.index("月")+1] + workday
                 if "年" not in workday:
                     workday = year + "年" + workday
+                before_workday = workday
                 workday = datetime.strptime(workday, "%Y年%m月%d日").strftime("%Y-%m-%d")
                 holiday_data.append((workday, workday, True))
     return (year, holiday_data)
@@ -241,5 +251,3 @@ if __name__ == "__main__":
         year_holiday = parse_holiday_info(notice_url)
         all_holiday.append(year_holiday)
     save_all_holiday(dict(all_holiday))
-    get_holiday_data(2012, force_refresh=True)
-    get_holiday_data(2025, force_refresh=True)
