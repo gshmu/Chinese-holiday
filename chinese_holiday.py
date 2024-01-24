@@ -207,9 +207,7 @@ def parse_holiday_info(url):
         r"""
 ((?:\d{4}年)?\d{1,2}月\d{1,2}日)                #开始日
 (?:至((?:\d{4}年)?(?:\d{1,2}月)?\d{1,2}日))?    #结束日，可能没有
-放假.*?
-(?:共(\d)天)?。                                 #天数，可能没有
-""",
+放假""",
         re.VERBOSE,
     )
     for holiday_line in holiday_lines:
@@ -217,7 +215,6 @@ def parse_holiday_info(url):
         for holiday_occur in reg_holiday_occur.finditer(holiday_line):
             first_holiday, last_holiday, count_day = holiday_occur.groups()
             if count_day is None:
-                # TODO: 未来可能公告中不出现“共3天”，届时从last_holiday推算
                 count_day = "1"
             if "年" not in first_holiday:
                 first_holiday = year + "年" + first_holiday
