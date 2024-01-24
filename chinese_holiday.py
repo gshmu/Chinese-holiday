@@ -37,16 +37,10 @@ def get_holiday_data(year, force_refresh=False):
                      ('2020-1-19', '2020-1-19', True) 表示2020-1-19补班
     """
     year = str(year)
-    all_holiday = {}
     holiday_data = None
     if os.path.exists(HOLIDAY_DATA_PATH):
-        with open(HOLIDAY_DATA_PATH, "r", encoding="utf8") as fp:
-            try:
-                all_holiday = json.load(fp)
-            except Exception:
-                all_holiday = {}
-            if type(all_holiday) == dict:
-                holiday_data = all_holiday.get(str(year), None)
+        all_holiday = read_all_holiday()
+        holiday_data = all_holiday.get(str(year), None)
     if holiday_data is None or force_refresh:
         url = search_notice_url(year)
         parsed_year, holiday_data = parse_holiday_info(url)
@@ -60,6 +54,30 @@ def get_holiday_data(year, force_refresh=False):
 def save_all_holiday(all_holiday):
     with open(HOLIDAY_DATA_PATH, "w", encoding="utf8") as fp:
         json.dump(all_holiday, fp, indent=2, ensure_ascii=False)
+
+
+def read_all_holiday():
+    with open(HOLIDAY_DATA_PATH, "r", encoding="utf8") as fp:
+        try:
+            all_holiday = json.load(fp)
+        except Exception:
+            all_holiday = {}
+    if not isinstance(all_holiday, dict):
+        return {}
+    return all_holiday
+
+
+def get_delta():
+    result = {True: [], False: []}
+    for year, data in read_all_holiday().items():
+        for start, end, work in data:
+            start = datetime.strptime(start, "%Y-%m-%d")
+            days = (datetime.strptime(end, "%Y-%m-%d") - start).days + 1
+            for delta in range(days):
+                day = (start + timedelta(days=delta)).date()
+                if (not work and day.weekday() < 5) or (work and day.weekday() >= 5):
+                    result[work].append(day)
+    return result
 
 
 def is_holiday(date_time):
@@ -248,3 +266,5 @@ if __name__ == "__main__":
         year_holiday = parse_holiday_info(notice_url)
         all_holiday.append(year_holiday)
     save_all_holiday(dict(all_holiday))
+
+    print(get_delta())
